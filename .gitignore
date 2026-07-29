@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+uploads/photos/*
+uploads/videos/*
+uploads/synced/*
+!uploads/photos/.gitkeep
+!uploads/videos/.gitkeep
+*.log
+.DS_Store

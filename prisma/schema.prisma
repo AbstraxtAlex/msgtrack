@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model admin {
+  id       Int    @id @default(autoincrement())
+  username String @unique(map: "Admin_username_key")
+  password String
+}
+
+model media {
+  id           Int      @id @default(autoincrement())
+  technicianId Int
+  type         String
+  filePath     String
+  fileName     String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([technicianId], map: "Media_technicianId_idx")
+}
+
+model technician {
+  id           Int       @id @default(autoincrement())
+  name         String
+  zone         String    @default("S")
+  fieldWork    Boolean   @default(false)
+  status       String    @default("Off Duty")
+  workingToday Boolean   @default(false)
+  externalId   Int?      @unique(map: "Technician_externalId_key")
+  syncedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+}
+
+model timer {
+  id               Int      @id @default(autoincrement())
+  technicianId     Int      @unique(map: "Timer_technicianId_key")
+  remainingSeconds Int      @default(0)
+  isRunning        Boolean  @default(false)
+  updatedAt        DateTime
+}
