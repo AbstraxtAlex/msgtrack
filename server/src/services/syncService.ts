@@ -16,6 +16,8 @@ interface RemoteTechnician {
   media: { id: number; post_id: number; file_path: string; file_type: string }[];
 }
 
+const serverRoot = path.join(__dirname, '..', '..');
+
 let syncInterval: NodeJS.Timeout | null = null;
 let isSyncing = false;
 let lastSyncAt: Date | null = null;
@@ -49,7 +51,7 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
 
       const allMedia = await prisma.media.findMany();
       for (const m of allMedia) {
-        const fullPath = path.join(process.cwd(), m.filePath);
+        const fullPath = path.join(serverRoot, m.filePath);
         try { if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath); } catch {}
       }
       await prisma.media.deleteMany();
@@ -236,7 +238,7 @@ async function fetchAndParse(baseUrl: string): Promise<RemoteTechnician[] | null
 }
 
 async function syncMedia(techId: number, remote: RemoteTechnician, baseUrl: string) {
-  const syncedDir = path.join(process.cwd(), 'uploads', 'synced');
+  const syncedDir = path.join(serverRoot, 'uploads', 'synced');
   if (!fs.existsSync(syncedDir)) fs.mkdirSync(syncedDir, { recursive: true });
 
   const existingMedia = await prisma.media.findMany({ where: { technicianId: techId } });
