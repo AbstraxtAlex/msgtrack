@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin
+Disallow: /login
+Disallow: /uploads/synced/
+Disallow: /uploads/photos/
+Disallow: /uploads/videos/

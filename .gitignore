@@ -4,7 +4,12 @@ dist
 uploads/photos/*
 uploads/videos/*
 uploads/synced/*
+server/uploads/photos/*
+server/uploads/videos/*
+server/uploads/synced/*
 !uploads/photos/.gitkeep
 !uploads/videos/.gitkeep
+!server/uploads/photos/.gitkeep
+!server/uploads/videos/.gitkeep
 *.log
 .DS_Store

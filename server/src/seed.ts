@@ -10,8 +10,9 @@ export async function seedAdmin() {
       where: { username: adminUsername },
     });
 
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
     if (!existing) {
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
       await prisma.admin.create({
         data: {
           username: adminUsername,
@@ -20,7 +21,11 @@ export async function seedAdmin() {
       });
       console.log(`Admin user created: ${adminUsername}`);
     } else {
-      console.log('Admin user already exists');
+      await prisma.admin.update({
+        where: { id: existing.id },
+        data: { password: hashedPassword },
+      });
+      console.log(`Admin user updated: ${adminUsername}`);
     }
   } catch (error) {
     console.error('Seed admin error:', error);

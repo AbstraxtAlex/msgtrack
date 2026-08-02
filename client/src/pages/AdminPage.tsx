@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiUsers, FiCamera, FiClock, FiPlay, FiPause, FiPlus, FiTrash2, FiCheckCircle, FiRefreshCw, FiZap, FiWifi, FiWifiOff, FiArrowLeft } from 'react-icons/fi';
+import { FiUsers, FiCamera, FiClock, FiPlay, FiPause, FiPlus, FiTrash2, FiCheckCircle, FiRefreshCw, FiZap, FiWifi, FiWifiOff, FiArrowLeft, FiLogOut } from 'react-icons/fi';
 import api from '../lib/api';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
 
 interface Tech {
   id: number; name: string; zone: string; fieldWork: boolean; status: string; workingToday: boolean; externalId: number | null;
@@ -22,6 +23,7 @@ const btn = (bg: string, color = '#fff'): React.CSSProperties => ({ padding: '10
 
 export default function AdminPage() {
   const { socket, connected } = useSocket();
+  const { logout } = useAuth();
   const [techs, setTechs] = useState<Tech[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'dashboard' | 'technicians' | 'media'>('dashboard');
@@ -32,6 +34,21 @@ export default function AdminPage() {
   const fetchSync = useCallback(async () => { try { const r = await api.get('/sync/status'); setSyncStatus(r.data); } catch {} }, []);
 
   useEffect(() => { fetchTechs(); fetchSync(); const iv = setInterval(fetchSync, 15000); return () => clearInterval(iv); }, [fetchTechs, fetchSync]);
+
+  // Auto refresh at midnight (00:00) — detects day change and refetches
+  useEffect(() => {
+    let lastDay = new Date().toDateString();
+    const iv = setInterval(() => {
+      const now = new Date();
+      const today = now.toDateString();
+      if (today !== lastDay) {
+        lastDay = today;
+        fetchTechs();
+        fetchSync();
+      }
+    }, 30000);
+    return () => clearInterval(iv);
+  }, [fetchTechs, fetchSync]);
 
   // Client-side countdown fallback — decrements running timers locally every second
   useEffect(() => {
@@ -62,8 +79,8 @@ export default function AdminPage() {
     };
     socket.on('technician:created', refresh); socket.on('technician:updated', refresh);
     socket.on('technician:deleted', refresh); socket.on('timer:tick', handleTick);
-    socket.on('sync:completed', refresh);
-    return () => { socket.off('technician:created', refresh); socket.off('technician:updated', refresh); socket.off('technician:deleted', refresh); socket.off('timer:tick', handleTick); socket.off('sync:completed', refresh); };
+    socket.on('sync:completed', refresh); socket.on('sync:cleaned', refresh);
+    return () => { socket.off('technician:created', refresh); socket.off('technician:updated', refresh); socket.off('technician:deleted', refresh); socket.off('timer:tick', handleTick); socket.off('sync:completed', refresh); socket.off('sync:cleaned', refresh); };
   }, [socket, fetchTechs]);
 
   const timerAction = async (id: number, action: string, minutes?: number) => {
@@ -72,6 +89,11 @@ export default function AdminPage() {
   };
 
   const refresh = () => { fetchTechs(); };
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
 
   return (
     <>
@@ -90,6 +112,7 @@ export default function AdminPage() {
               <button key={k} onClick={() => setTab(k)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 800, letterSpacing: 1, background: tab === k ? 'rgba(184,134,11,0.15)' : 'transparent', color: tab === k ? '#B8860B' : '#9B9B9B', border: tab === k ? '1px solid #C6A962' : 'none' }}>{i} {l}</button>
             ))}
           </nav>
+          <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 800, background: 'rgba(239,68,68,0.12)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)' }}><FiLogOut size={12} /> 退出</button>
         </div>
       </header>
       <main style={{ maxWidth: 1300, margin: '0 auto', padding: '16px 12px' }}>

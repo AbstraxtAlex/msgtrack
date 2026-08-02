@@ -63,6 +63,7 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
       console.log(`Daily cleanup: deleted ${deletedTimers.count} stale timers`);
 
       lastCleanupDate = today;
+      emitToAll('sync:cleaned', { date: today, deletedTechs: deletedTechs.count });
     }
 
     let count = 0;
@@ -165,7 +166,7 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
       include: { media: true, timer: true },
       orderBy: { createdAt: 'desc' },
     });
-    emitToAll('sync:complete', { count, total: allTechs.length });
+    emitToAll('sync:completed', { count, total: allTechs.length });
 
     lastSyncAt = new Date();
     lastSyncCount = count;

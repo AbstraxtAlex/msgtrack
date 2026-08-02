@@ -51,6 +51,20 @@ export function useTechnicians() {
 
   useEffect(() => { fetchTechnicians(); }, [fetchTechnicians]);
 
+  // Auto refresh after sync / daily cleanup / midnight
+  useEffect(() => {
+    let lastDay = new Date().toDateString();
+    const iv = setInterval(() => {
+      const now = new Date();
+      const today = now.toDateString();
+      if (today !== lastDay) {
+        lastDay = today;
+        fetchTechnicians();
+      }
+    }, 30000);
+    return () => clearInterval(iv);
+  }, [fetchTechnicians]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -58,6 +72,8 @@ export function useTechnicians() {
     const handleUpdated = () => fetchTechnicians();
     const handleDeleted = () => fetchTechnicians();
     const handleMediaUpdated = () => fetchTechnicians();
+    const handleSyncCompleted = () => fetchTechnicians();
+    const handleSyncCleaned = () => fetchTechnicians();
 
     // Live timer tick — update remainingSeconds without refetch
     const handleTick = (data: { technicianId: number; remainingSeconds: number; isRunning: boolean }) => {
@@ -78,6 +94,8 @@ export function useTechnicians() {
     socket.on('technician:deleted', handleDeleted);
     socket.on('media:updated', handleMediaUpdated);
     socket.on('timer:tick', handleTick);
+    socket.on('sync:completed', handleSyncCompleted);
+    socket.on('sync:cleaned', handleSyncCleaned);
 
     return () => {
       socket.off('technician:created', handleCreated);
@@ -85,6 +103,8 @@ export function useTechnicians() {
       socket.off('technician:deleted', handleDeleted);
       socket.off('media:updated', handleMediaUpdated);
       socket.off('timer:tick', handleTick);
+      socket.off('sync:completed', handleSyncCompleted);
+      socket.off('sync:cleaned', handleSyncCleaned);
     };
   }, [socket, fetchTechnicians]);
 

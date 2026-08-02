@@ -38,6 +38,9 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').sendFile(path.join(__dirname, 'static', 'robots.txt'));
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/technicians', technicianRoutes);
@@ -108,10 +111,9 @@ const PORT = process.env.PORT || 5000;
 async function start() {
   try {
     await seedAdmin();
-    // Sync disabled for now — use admin manual sync instead
-    // if (process.env.SYNC_ENABLED === 'true') {
-    //   startSync();
-    // }
+    if (process.env.SYNC_ENABLED === 'true') {
+      startSync();
+    }
     server.listen(Number(PORT), '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });
