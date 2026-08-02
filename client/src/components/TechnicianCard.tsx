@@ -1,4 +1,5 @@
 import { Technician } from '../hooks/useTechnicians';
+import { withBasePath } from '../lib/basePath';
 import { FiImage } from 'react-icons/fi';
 
 interface Props {
@@ -39,7 +40,7 @@ export default function TechnicianCard({ technician, index, onClick }: Props) {
         {coverMedia ? (
           isVideo ? (
             <div className="relative">
-              <video src={coverMedia.filePath + '#t=0.1'} preload="metadata" playsInline muted className="cover-aspect" />
+              <video src={withBasePath(coverMedia.filePath) + '#t=0.1'} preload="metadata" playsInline muted className="cover-aspect" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-10 h-10 bg-white/70 backdrop-blur-sm rounded-full border border-[#E6DFD0] flex items-center justify-center pl-1 shadow-md">
                   <span className="text-[#8B6914] text-sm">▶</span>
@@ -47,7 +48,7 @@ export default function TechnicianCard({ technician, index, onClick }: Props) {
               </div>
             </div>
           ) : (
-            <img src={coverMedia.filePath} loading="lazy" className="cover-aspect" alt="" />
+            <img src={withBasePath(coverMedia.filePath)} loading="lazy" className="cover-aspect" alt="" />
           )
         ) : (
           <div className="cover-aspect bg-[#F5F3EE] flex items-center justify-center">

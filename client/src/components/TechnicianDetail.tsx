@@ -1,4 +1,5 @@
 import { Technician } from '../hooks/useTechnicians';
+import { withBasePath } from '../lib/basePath';
 import { FiX, FiStar } from 'react-icons/fi';
 
 interface Props {
@@ -74,11 +75,11 @@ export default function TechnicianDetail({ technician, onClose }: Props) {
             {technician.media.map((m) =>
               m.type === 'video' ? (
                 <div key={m.id} className="rounded-2xl overflow-hidden luxury-border luxury-glow">
-                  <video src={m.filePath} preload="metadata" playsInline loop controls className="w-full bg-[#F5F3EE]" />
+                  <video src={withBasePath(m.filePath)} preload="metadata" playsInline loop controls className="w-full bg-[#F5F3EE]" />
                 </div>
               ) : (
                 <div key={m.id} className="rounded-2xl overflow-hidden luxury-border luxury-glow">
-                  <img src={m.filePath} loading="lazy" className="w-full" alt="" />
+                  <img src={withBasePath(m.filePath)} loading="lazy" className="w-full" alt="" />
                 </div>
               )
             )}

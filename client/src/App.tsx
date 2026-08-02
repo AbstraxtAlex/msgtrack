@@ -5,6 +5,7 @@ import { SocketProvider } from './context/SocketContext';
 import HomePage from './pages/HomePage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
+import { appBasePath } from './lib/basePath';
 
 function ProtectedAdmin({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -17,7 +18,7 @@ function ProtectedAdmin({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={appBasePath || undefined}>
       <AuthProvider>
         <SocketProvider>
           <Routes>

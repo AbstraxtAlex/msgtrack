@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTechnicians, Technician } from '../hooks/useTechnicians';
 import TechnicianCard from '../components/TechnicianCard';
 import TechnicianDetail from '../components/TechnicianDetail';
-import { FiLoader, FiStar, FiMessageCircle } from 'react-icons/fi';
+import { FiLoader, FiStar, FiSearch } from 'react-icons/fi';
 
 const WHATSAPP_MSG = encodeURIComponent('您好，我想预约服务');
 const TELEGRAM_USER = 'nhlg09';
@@ -12,6 +12,7 @@ export default function HomePage() {
   const { technicians, loading } = useTechnicians();
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null);
   const [filter, setFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
 
   const filters = [
     { key: 'ALL', label: '首页' },
@@ -23,6 +24,8 @@ export default function HomePage() {
   ];
 
   const filtered = technicians.filter(t => {
+    const query = search.trim().toLowerCase();
+    if (query && !t.name.toLowerCase().includes(query)) return false;
     if (filter === 'ALL') return true;
     if (filter === 'FIELD') return t.fieldWork;
     return t.zone === filter;
@@ -61,7 +64,17 @@ export default function HomePage() {
       </div>
 
       <nav className="sticky top-0 z-30 py-3 px-3 glass">
-        <div className="flex gap-1.5 max-w-2xl mx-auto w-full overflow-x-auto scrollbar-hide">
+        <div className="max-w-2xl mx-auto w-full">
+          <div className="relative mb-2">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B8860B]" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="搜索技师编号，如 T987 / S817"
+              className="w-full rounded-xl border border-[#E6DFD0] bg-white px-9 py-2.5 text-xs font-bold text-[#1A1A1A] outline-none placeholder:text-[#B8A88A]"
+            />
+          </div>
+          <div className="flex gap-1.5 w-full overflow-x-auto scrollbar-hide">
           {filters.map((f) => (
             <button
               key={f.key}
@@ -73,6 +86,7 @@ export default function HomePage() {
               {f.label}
             </button>
           ))}
+          </div>
         </div>
       </nav>
 

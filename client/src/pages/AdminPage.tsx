@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiUsers, FiCamera, FiClock, FiPlay, FiPause, FiPlus, FiTrash2, FiCheckCircle, FiRefreshCw, FiZap, FiWifi, FiWifiOff, FiArrowLeft, FiLogOut } from 'react-icons/fi';
+import { FiUsers, FiCamera, FiClock, FiPlay, FiPause, FiPlus, FiTrash2, FiCheckCircle, FiRefreshCw, FiZap, FiWifi, FiWifiOff, FiArrowLeft, FiLogOut, FiSearch } from 'react-icons/fi';
 import api from '../lib/api';
+import { withBasePath } from '../lib/basePath';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,8 +19,42 @@ function fmt(s: number) {
 }
 
 const ZONES = ['A', 'S', 'T', 'M'];
+const TIMER_OPTIONS = [
+  { minutes: 60, label: '60分钟' },
+  { minutes: 90, label: '90分钟' },
+  { minutes: 240, label: '4小时' },
+  { minutes: 480, label: '8小时' },
+];
 
 const btn = (bg: string, color = '#fff'): React.CSSProperties => ({ padding: '10px 20px', borderRadius: 12, background: bg, color, border: 'none', fontWeight: 800 as const, fontSize: 12, cursor: 'pointer' });
+
+const searchInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 12px 10px 36px',
+  borderRadius: 10,
+  border: '1px solid #E8E0D0',
+  background: '#FFFFFF',
+  color: '#1A1A1A',
+  fontSize: 12,
+  fontWeight: 700,
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+function SearchBox({ value, onChange, placeholder = '搜索技师编号，如 T987 / S817' }: { value: string; onChange: (value: string) => void; placeholder?: string }) {
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <FiSearch size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#B8860B' }} />
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={searchInputStyle} />
+    </div>
+  );
+}
+
+function matchesTechSearch(t: Tech, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return t.name.toLowerCase().includes(q);
+}
 
 export default function AdminPage() {
   const { socket, connected } = useSocket();
@@ -92,7 +127,7 @@ export default function AdminPage() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = '/login';
+    window.location.href = withBasePath('/login');
   };
 
   return (
@@ -145,8 +180,8 @@ function TimerInline({ t, timerAction }: { t: Tech; timerAction: (id: number, ac
           <button onClick={() => timerAction(t.id, 'resume')} style={{ ...btn('#059669'), padding: '6px 10px', fontSize: 10 }} title="继续"><FiPlay size={11} /></button>
         )}
         <button onClick={() => timerAction(t.id, 'finish')} style={{ ...btn('#1D4ED8'), padding: '6px 10px', fontSize: 10 }} title="结束"><FiCheckCircle size={11} /></button>
-        {[10, 15, 30].map(m => (
-          <button key={m} onClick={() => timerAction(t.id, 'add-time', m)} style={{ ...btn('#F5F3EE'), color: '#8B6914', padding: '6px 8px', fontSize: 10, border: '1px solid #E8E0D0' }}>+{m}m</button>
+        {TIMER_OPTIONS.map(option => (
+          <button key={option.minutes} onClick={() => timerAction(t.id, 'add-time', option.minutes)} style={{ ...btn('#F5F3EE'), color: '#8B6914', padding: '6px 8px', fontSize: 10, border: '1px solid #E8E0D0' }}>+{option.label}</button>
         ))}
       </div>
     );
@@ -154,8 +189,8 @@ function TimerInline({ t, timerAction }: { t: Tech; timerAction: (id: number, ac
 
   return (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-      {[1, 2, 3, 4, 5, 6, 7, 8].map(h => (
-        <button key={h} onClick={() => timerAction(t.id, 'start', h * 60)} style={{ ...btn('#F0FDF4'), color: '#166534', padding: '5px 10px', fontSize: 11, border: '1px solid #BBF7D0' }}>{h}时</button>
+      {TIMER_OPTIONS.map(option => (
+        <button key={option.minutes} onClick={() => timerAction(t.id, 'start', option.minutes)} style={{ ...btn('#F0FDF4'), color: '#166534', padding: '5px 10px', fontSize: 11, border: '1px solid #BBF7D0' }}>{option.label}</button>
       ))}
     </div>
   );
@@ -163,6 +198,7 @@ function TimerInline({ t, timerAction }: { t: Tech; timerAction: (id: number, ac
 
 function Dashboard({ techs, syncStatus, fetchSync, timerAction, refresh }: { techs: Tech[]; syncStatus: any; fetchSync: () => void; timerAction: (id: number, action: string, m?: number) => void; refresh: () => void }) {
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const handleSync = async (action: 'start' | 'stop' | 'manual') => { try { const r = await api.post(`/sync/${action}`); toast.success(r.data.message); fetchSync(); } catch (e: any) { toast.error(e?.response?.data?.error || '操作失败'); } };
 
   const workingToday = techs.filter(t => t.workingToday).length;
@@ -192,8 +228,8 @@ function Dashboard({ techs, syncStatus, fetchSync, timerAction, refresh }: { tec
     else if (filter === 'resting') list = list.filter(t => t.status === 'Resting');
     else if (filter === 'off') list = list.filter(t => !t.workingToday);
 
-    return list;
-  }, [techs, filter]);
+    return list.filter(t => matchesTechSearch(t, search));
+  }, [techs, filter, search]);
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -229,7 +265,10 @@ function Dashboard({ techs, syncStatus, fetchSync, timerAction, refresh }: { tec
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ fontSize: 13, fontWeight: 800, color: '#8B6914', letterSpacing: 1 }}>技师列表 ({filtered.length}/{techs.length})</h3>
           </div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr)', gap: 10 }}>
+            <SearchBox value={search} onChange={setSearch} />
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 10 }}>
             {filters.map(f => (
               <button key={f.key} onClick={() => setFilter(f.key)} style={{ padding: '5px 10px', borderRadius: 8, fontSize: 10, fontWeight: 800, cursor: 'pointer', border: 'none', background: filter === f.key ? '#8B6914' : '#F5F3EE', color: filter === f.key ? '#fff' : '#6B6B6B', transition: 'all 0.15s' }}>{f.label}</button>
             ))}
@@ -267,6 +306,8 @@ function TechnicianTab({ techs, loading, refresh, timerAction }: { techs: Tech[]
   const [newName, setNewName] = useState('');
   const [newZone, setNewZone] = useState('A');
   const [newFieldWork, setNewFieldWork] = useState(false);
+  const [search, setSearch] = useState('');
+  const filteredTechs = useMemo(() => techs.filter(t => matchesTechSearch(t, search)), [techs, search]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return toast.error('请输入姓名');
@@ -282,9 +323,10 @@ function TechnicianTab({ techs, loading, refresh, timerAction }: { techs: Tech[]
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 900, color: '#1A1A1A', letterSpacing: 1 }}>技师管理</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 900, color: '#1A1A1A', letterSpacing: 1 }}>技师管理 ({filteredTechs.length}/{techs.length})</h2>
         <button onClick={() => setShowCreate(!showCreate)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 12, background: '#8B6914', color: '#fff', border: 'none', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}><FiPlus /> 新建技师</button>
       </div>
+      <SearchBox value={search} onChange={setSearch} />
       {showCreate && (
         <Card style={{ padding: 16 }}>
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="技师姓名" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E8E0D0', background: '#FAF8F3', fontSize: 13, fontWeight: 600, color: '#1A1A1A', marginBottom: 10, boxSizing: 'border-box' }} />
@@ -302,7 +344,7 @@ function TechnicianTab({ techs, loading, refresh, timerAction }: { techs: Tech[]
       )}
       {loading ? <p style={{ color: '#9B9B9B', textAlign: 'center', padding: 40 }}>加载中...</p> : (
         <div style={{ display: 'grid', gap: 8 }}>
-          {techs.map(t => (
+          {filteredTechs.map(t => (
             <Card key={t.id} style={{ padding: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
@@ -330,6 +372,8 @@ function TechnicianTab({ techs, loading, refresh, timerAction }: { techs: Tech[]
 
 function MediaTab({ techs, refresh }: { techs: Tech[]; refresh: () => void }) {
   const [uploading, setUploading] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const filteredTechs = useMemo(() => techs.filter(t => matchesTechSearch(t, search)), [techs, search]);
   const handleUpload = async (techId: number) => {
     const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,video/*';
     input.onchange = async (e: any) => {
@@ -343,8 +387,9 @@ function MediaTab({ techs, refresh }: { techs: Tech[]; refresh: () => void }) {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 900, color: '#1A1A1A', letterSpacing: 1 }}>相册管理</h2>
-      {techs.map(t => (
+      <h2 style={{ fontSize: 16, fontWeight: 900, color: '#1A1A1A', letterSpacing: 1 }}>相册管理 ({filteredTechs.length}/{techs.length})</h2>
+      <SearchBox value={search} onChange={setSearch} />
+      {filteredTechs.map(t => (
         <Card key={t.id} style={{ padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div><span style={{ fontWeight: 800, fontSize: 14, color: '#1A1A1A' }}>{t.name}</span><span style={{ fontSize: 11, color: '#9B9B9B', marginLeft: 8 }}>{t.zone}区 · {t.media.length}个文件</span></div>
@@ -353,7 +398,7 @@ function MediaTab({ techs, refresh }: { techs: Tech[]; refresh: () => void }) {
           {t.media.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {t.media.map(m => (
               <div key={m.id} style={{ position: 'relative', width: 80, height: 80, borderRadius: 10, overflow: 'hidden', border: '1px solid #E8E0D0' }}>
-                {m.type === 'photo' ? <img src={`/uploads/${m.filePath.replace(/^.*?uploads\//, '')}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#F5F3EE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B6914', fontSize: 20 }}>{'>'}</div>}
+                {m.type === 'photo' ? <img src={withBasePath(`/uploads/${m.filePath.replace(/^.*?uploads\//, '')}`)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#F5F3EE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B6914', fontSize: 20 }}>{'>'}</div>}
                 <button onClick={() => handleDeleteMedia(m.id)} style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: 6, background: 'rgba(153,27,27,0.85)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}><FiTrash2 /></button>
               </div>
             ))}

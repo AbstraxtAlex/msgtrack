@@ -19,10 +19,17 @@ import dashboardRoutes from './routes/dashboard';
 import syncRoutes from './routes/sync';
 import { startSync } from './services/syncService';
 
+function normalizeBasePath(value?: string) {
+  if (!value || value === '/') return '';
+  return `/${value.replace(/^\/+|\/+$/g, '')}`;
+}
+
+const BASE_PATH = normalizeBasePath(process.env.BASE_PATH);
 const app = express();
 const server = createServer(app);
 
 const io = new Server(server, {
+  path: `${BASE_PATH}/socket.io`,
   cors: {
     origin: true,
     credentials: true,
@@ -37,23 +44,33 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use(`${BASE_PATH}/uploads`, express.static(path.join(__dirname, '..', 'uploads')));
 app.get('/robots.txt', (_req, res) => {
   res.type('text/plain').sendFile(path.join(__dirname, 'static', 'robots.txt'));
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/technicians', technicianRoutes);
-app.use('/api/media', mediaRoutes);
-app.use('/api/timer', timerRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/sync', syncRoutes);
+app.use(`${BASE_PATH}/api/auth`, authRoutes);
+app.use(`${BASE_PATH}/api/technicians`, technicianRoutes);
+app.use(`${BASE_PATH}/api/media`, mediaRoutes);
+app.use(`${BASE_PATH}/api/timer`, timerRoutes);
+app.use(`${BASE_PATH}/api/dashboard`, dashboardRoutes);
+app.use(`${BASE_PATH}/api/sync`, syncRoutes);
 
 const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
-app.use(express.static(clientDistPath));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientDistPath, 'index.html'));
-});
+if (BASE_PATH) {
+  app.get(BASE_PATH, (_req, res) => {
+    res.redirect(301, `${BASE_PATH}/`);
+  });
+  app.use(BASE_PATH, express.static(clientDistPath));
+  app.get(`${BASE_PATH}/*`, (_req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  app.use(express.static(clientDistPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -115,7 +132,7 @@ async function start() {
       startSync();
     }
     server.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`Server running on port ${PORT}${BASE_PATH || ''}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

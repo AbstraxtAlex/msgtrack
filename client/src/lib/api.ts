@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { pathWithoutBase, withBasePath } from './basePath';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: withBasePath('/api'),
   withCredentials: true,
 });
 
@@ -18,8 +19,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
-        window.location.href = '/admin/login';
+      const currentPath = pathWithoutBase(window.location.pathname);
+      if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
+        window.location.href = withBasePath('/admin/login');
       }
     }
     return Promise.reject(error);

@@ -32,7 +32,7 @@ export function getSyncStatus() {
     lastCleanupDate,
     technicianCount: lastSyncCount,
     syncUrl: process.env.SYNC_URL || 'https://tt.021.lol',
-    syncInterval: parseInt(process.env.SYNC_INTERVAL || '30'),
+    syncInterval: parseInt(process.env.SYNC_INTERVAL || '300'),
   };
 }
 
@@ -69,6 +69,7 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
     }
 
     let count = 0;
+    let skippedActiveCount = 0;
     const seenExternalIds = new Set<number>();
 
     for (const remote of technicians) {
@@ -86,7 +87,16 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
         remainingSeconds = remote.timer_end_at - Math.floor(Date.now() / 1000);
       }
 
-      const existing = await prisma.technician.findUnique({ where: { externalId: remote.id } });
+      const existing = await prisma.technician.findUnique({
+        where: { externalId: remote.id },
+        include: { timer: true },
+      });
+
+      if (existing && hasProtectedLocalTimer(existing)) {
+        skippedActiveCount++;
+        count++;
+        continue;
+      }
 
       let tech;
       if (existing) {
@@ -147,6 +157,10 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
 
     for (const tech of syncedTechs) {
       if (!seenExternalIds.has(tech.externalId!)) {
+        if (hasProtectedLocalTimer(tech)) {
+          continue;
+        }
+
         await prisma.technician.update({
           where: { id: tech.id },
           data: { workingToday: false, status: 'Off Duty', syncedAt: new Date() },
@@ -168,7 +182,7 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
       include: { media: true, timer: true },
       orderBy: { createdAt: 'desc' },
     });
-    emitToAll('sync:completed', { count, total: allTechs.length });
+    emitToAll('sync:completed', { count, total: allTechs.length, skippedActiveCount });
 
     lastSyncAt = new Date();
     lastSyncCount = count;
@@ -290,7 +304,7 @@ function mapStatus(timerStatus: string, timerEndAt: number): string {
 
 export function startSync() {
   if (syncInterval) return;
-  const interval = parseInt(process.env.SYNC_INTERVAL || '30') * 1000;
+  const interval = parseInt(process.env.SYNC_INTERVAL || '300') * 1000;
   console.log(`Starting sync service (interval: ${interval / 1000}s)`);
   syncNow();
   syncInterval = setInterval(syncNow, interval);
@@ -302,4 +316,8 @@ export function stopSync() {
     syncInterval = null;
     console.log('Sync service stopped');
   }
+}
+
+function hasProtectedLocalTimer(tech: { status: string; timer?: { remainingSeconds: number } | null }) {
+  return tech.status === 'Busy' && Boolean(tech.timer && tech.timer.remainingSeconds > 0);
 }
