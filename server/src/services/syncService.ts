@@ -93,6 +93,9 @@ export async function syncNow(): Promise<{ success: boolean; count: number; erro
       });
 
       if (existing && hasProtectedLocalTimer(existing)) {
+        if (remote.media && remote.media.length > 0) {
+          await syncMedia(existing.id, remote, baseUrl);
+        }
         skippedActiveCount++;
         count++;
         continue;
@@ -256,14 +259,16 @@ async function syncMedia(techId: number, remote: RemoteTechnician, baseUrl: stri
   if (!fs.existsSync(syncedDir)) fs.mkdirSync(syncedDir, { recursive: true });
 
   const existingMedia = await prisma.media.findMany({ where: { technicianId: techId } });
-  const existingPaths = new Set(existingMedia.map((m: { fileName: string }) => m.fileName));
+  const existingByFileName = new Map(existingMedia.map((m: { fileName: string }) => [m.fileName, m]));
 
   for (let i = 0; i < remote.media.length; i++) {
     const m = remote.media[i];
     const remotePath = m.file_path.replace(/\\\//g, '/');
     const fileName = `${remote.emp_code}_${path.basename(remotePath)}`;
+    const localPath = path.join(syncedDir, fileName);
+    const alreadyInDb = existingByFileName.has(fileName);
 
-    if (existingPaths.has(fileName)) continue;
+    if (alreadyInDb && fs.existsSync(localPath)) continue;
 
     try {
       const fileUrl = `${baseUrl}/${remotePath}`;
@@ -272,9 +277,14 @@ async function syncMedia(techId: number, remote: RemoteTechnician, baseUrl: stri
       });
       if (!response.ok) continue;
 
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) continue;
+
       const buffer = Buffer.from(await response.arrayBuffer());
-      const localPath = path.join(syncedDir, fileName);
+      if (buffer.length === 0) continue;
       fs.writeFileSync(localPath, buffer);
+
+      if (alreadyInDb) continue;
 
       const type = m.file_type === 'video' ? 'video' : 'photo';
       await prisma.media.create({
