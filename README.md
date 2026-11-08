@@ -171,3 +171,15 @@ massage-tracker/
 ## License
 
 MIT
+
+## Outgoing traffic via VPN (Tinyproxy)
+
+All backend-originated HTTP/HTTPS requests (native `fetch`, and anything built on `node:http(s)` such as axios/got) are routed through `SYNC_PROXY` by `server/src/lib/outboundProxy.ts`, loaded first in `server/src/index.ts`.
+
+```env
+SYNC_PROXY=http://127.0.0.1:8888      # Tinyproxy (bound to the WireGuard IP 10.2.0.2)
+SYNC_PROXY_REQUIRED=true              # optional: refuse to start without a proxy (fail closed)
+SYNC_NO_PROXY=                        # optional extra bypass hosts; localhost/private ranges always bypass
+```
+
+If the backend runs in Docker, set `Listen` in tinyproxy.conf to the docker bridge IP (e.g. `172.17.0.1`), add `Allow 172.17.0.0/16`, keep `Bind 10.2.0.2`, use `SYNC_PROXY=http://172.17.0.1:8888`, and firewall port 8888 from the public interface. MySQL, Socket.IO and inbound requests are not proxied.

@@ -2,6 +2,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 
+import './lib/outboundProxy'; // must load right after dotenv: routes all outgoing HTTP(S) via SYNC_PROXY
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
