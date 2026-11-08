@@ -19,6 +19,7 @@ interface RemoteTechnician {
 const serverRoot = path.join(__dirname, '..', '..');
 
 let syncInterval: NodeJS.Timeout | null = null;
+let nextSyncAt: Date | null = null;
 let isSyncing = false;
 let lastSyncAt: Date | null = null;
 let lastSyncCount = 0;
@@ -32,7 +33,8 @@ export function getSyncStatus() {
     lastCleanupDate,
     technicianCount: lastSyncCount,
     syncUrl: process.env.SYNC_URL || 'https://tt.021.lol',
-    syncInterval: parseInt(process.env.SYNC_INTERVAL || '300'),
+    schedule: describeSchedule(),
+    nextSyncAt,
   };
 }
 
@@ -312,18 +314,60 @@ function mapStatus(timerStatus: string, timerEndAt: number): string {
   return 'Available';
 }
 
+function scheduleConfig() {
+  const [hRaw, mRaw] = (process.env.SYNC_AT || '18:00').split(':').map(Number);
+  const offsetRaw = Number(process.env.SYNC_UTC_OFFSET_HOURS || 8); // 8 = Malaysia (UTC+8, no daylight saving)
+  return {
+    hour: Number.isFinite(hRaw) ? hRaw : 18,
+    minute: Number.isFinite(mRaw) ? mRaw : 0,
+    offset: Number.isFinite(offsetRaw) ? offsetRaw : 8,
+  };
+}
+
+function describeSchedule() {
+  const { hour, minute, offset } = scheduleConfig();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `daily ${pad(hour)}:${pad(minute)} (UTC${offset >= 0 ? '+' : ''}${offset})`;
+}
+
+/** Milliseconds until the next wall-clock hh:mm in the configured UTC offset. Independent of the server's own time zone. */
+function msUntilNextRun(now: Date = new Date()): number {
+  const { hour, minute, offset } = scheduleConfig();
+  const hourMs = 3600 * 1000;
+  const local = new Date(now.getTime() + offset * hourMs); // read with getUTC* = wall clock in the target zone
+  let target = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour, minute, 0) - offset * hourMs;
+  if (target - now.getTime() < 1000) target += 24 * hourMs; // already passed (or timer fired a hair early): use tomorrow
+  return target - now.getTime();
+}
+
+function scheduleNextSync() {
+  const delay = msUntilNextRun();
+  nextSyncAt = new Date(Date.now() + delay);
+  console.log(`Next sync: ${nextSyncAt.toISOString()} (${describeSchedule()})`);
+  syncInterval = setTimeout(async () => {
+    try {
+      await syncNow();
+    } catch (error: any) {
+      console.error('Scheduled sync error:', error?.message);
+    } finally {
+      scheduleNextSync();
+    }
+  }, delay);
+}
+
 export function startSync() {
   if (syncInterval) return;
-  const interval = parseInt(process.env.SYNC_INTERVAL || '300') * 1000;
-  console.log(`Starting sync service (interval: ${interval / 1000}s)`);
-  syncNow();
-  syncInterval = setInterval(syncNow, interval);
+  console.log(`Starting sync service (${describeSchedule()})`);
+  // A restart no longer re-imports everything by default; set SYNC_ON_START=true for a sync at boot.
+  if (process.env.SYNC_ON_START === 'true') syncNow();
+  scheduleNextSync();
 }
 
 export function stopSync() {
   if (syncInterval) {
-    clearInterval(syncInterval);
+    clearTimeout(syncInterval);
     syncInterval = null;
+    nextSyncAt = null;
     console.log('Sync service stopped');
   }
 }

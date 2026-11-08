@@ -183,3 +183,16 @@ SYNC_NO_PROXY=                        # optional extra bypass hosts; localhost/p
 ```
 
 If the backend runs in Docker, set `Listen` in tinyproxy.conf to the docker bridge IP (e.g. `172.17.0.1`), add `Allow 172.17.0.0/16`, keep `Bind 10.2.0.2`, use `SYNC_PROXY=http://172.17.0.1:8888`, and firewall port 8888 from the public interface. MySQL, Socket.IO and inbound requests are not proxied.
+
+## Sync schedule
+
+The sync runs **once a day at 18:00 Malaysia time** (UTC+8, no daylight saving), not on an interval.
+
+| env var | default | meaning |
+|---|---|---|
+| `SYNC_AT` | `18:00` | wall-clock time of the daily sync (24h `HH:MM`) |
+| `SYNC_UTC_OFFSET_HOURS` | `8` | UTC offset that `SYNC_AT` is read in (8 = Malaysia) |
+| `SYNC_ON_START` | unset | `true` also syncs once at server start (a restart then re-runs the daily cleanup) |
+
+`SYNC_INTERVAL` is no longer used. If the server is down at the scheduled time, that day's sync is skipped.
+`GET /api/sync/status` shows `schedule` and `nextSyncAt`; `POST /api/sync/manual` (admin) syncs immediately.
